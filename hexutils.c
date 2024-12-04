@@ -3,21 +3,31 @@
 //#include <string.h>should be inside bzero
 #define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
 
-
-
-
-void stringtohex (char *text, unsigned char bytes[])
+void stringtohex(const TCHAR* text, TCHAR bytes[], size_t byteCount)
 {
-    int i;
-    int temp;
+  unsigned int temp;
 
-    for( i = 0; i < 4; ++i ) {
-        sscanf( text + 2 * i, "%2x", &temp );
-        bytes[i] = temp;
+  for (size_t i = 0; i < byteCount; ++i)
+  {
+    int result;
+#ifdef UNICODE
+    result = swscanf(text + 2 * i, _T("%2x"), &temp); // Parse two hexadecimal characters
+#else
+    result = sscanf(text + 2 * i, "%2x", &temp);
+#endif
+
+    if (result != 1) // Check if exactly one item was parsed successfully
+    {
+      bytes[i] = _T('\0'); // Null terminate to indicate failure
+      _tprintf(_T("Error: Unable to parse hex value at position %zu\n"), i);
+      return; // Exit on failure
     }
+
+    bytes[i] = (TCHAR) temp; // Store the value as a TCHAR
+  }
+
+  bytes[byteCount] = _T('\0'); // Null-terminate the TCHAR array
 }
-
-
 
 /*
  *  Convert a HEXADECIMAL character to a byte.

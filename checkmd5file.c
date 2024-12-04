@@ -1,5 +1,6 @@
 #include "md5.h"
 #include "main.h"
+#include "resource.h"
 
 void CheckMD5file (HWND hwnd)
 {
@@ -42,8 +43,8 @@ void CheckMD5file (HWND hwnd)
 		md5_finish(&state, digest);
 
 		hex[0]=0;
-		for(i=0;i<16;i++) 
-			sprintf(hex,_T("%s%02x"),hex,digest[i]);//FIX
+		for(i = 0; i < 16; i++)
+			_stprintf_s(hex, sizeof(hex) / sizeof(TCHAR), _T("%s%02x"), hex, digest[i]);
 
 		fclose(pfile);
 
@@ -52,39 +53,39 @@ void CheckMD5file (HWND hwnd)
 		//FREDZ start comparing
 		if (!_tcscmp(hex, kingpin121hex))//		if (!_tcscmp(hex, _T("3d1e42f299a15af7088b4687085537e7")))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.21 file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.21 file"));
 		}
 		else if (!_tcscmp(hex, kingpin121nocdhex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.21 NOCD file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.21 NOCD file"));
 		}
 		else if (!_tcscmp(hex, kingpin121steamhex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.21 Steam file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.21 Steam file"));
 		}
 		else if (!_tcscmp(hex, kingpin121goghex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.21 GOG file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.21 GOG file"));
 		}
 		else if (!_tcscmp(hex, kingpin022demohex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin alpha demo 0.22N file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin alpha demo 0.22N file"));
 		}
 		else if (!_tcscmp(hex, kingpin100hex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.00 file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.00 file"));
 		}
 		else if (!_tcscmp(hex, kingpin110hex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.10 file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.10 file"));
 		}
 		else if (!_tcscmp(hex, kingpin120hex))
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Orginale Kingpin 1.20 file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Orginale Kingpin 1.20 file"));
 		}
 		else
 		{
-			SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"No orginale Kingpin file");
+			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("No orginale Kingpin file"));
 		}
 		//FREDZ end comparing	
 	}	

@@ -1,21 +1,30 @@
 #include "main.h"
+#include "resource.h"
+#include <io.h> // _open _read
+#include <fcntl.h> // O_ flags
+#include <sys/stat.h> // _S_IREAD
+#include <commctrl.h> // UDM_SETPOS
+#include <strsafe.h>
 
-#include <io.h>//_open _read
-#include <fcntl.h>//O_ flags
-
-void CheckKingpinFile (HWND hwnd, char *kpfilename)
+void CheckKingpinFile (HWND hwnd, TCHAR* kpfilename)
 {
 	TCHAR buffer[128] = _T("");//128 should be enough
 	int file, extraworking, coopclients;
 	long fileng ,checkoffs, nocdoffs, flagsoffs, clientoffs;
 	unsigned char checkbyte[7], nocdbyte[2], flagsbyte[1], clientbyte[2];
 
-	if ((file = _open(kpfilename, _O_BINARY|_O_RDWR,_S_IREAD)) == -1)
-   	{ 
-		wsprintf(buffer, _T("Cannot open %s."), kpfilename);
-		MessageBox(NULL, buffer, "Error", MB_ICONEXCLAMATION | MB_OK);                                                
-   		return;
+#ifdef UNICODE
+	if ((file = _wopen(kpfilename, _O_BINARY | _O_RDWR, _S_IREAD)) == -1)
+#else
+	if ((file = _open(kpfilename, _O_BINARY | _O_RDWR, _S_IREAD)) == -1)
+#endif
+	{
+		StringCchPrintf(buffer, 128, _T("Cannot open %s."), kpfilename);
+		MessageBox(NULL, buffer, _T("Error"), MB_ICONEXCLAMATION | MB_OK);
+		
+		return;
 	}
+
 	fileng = _filelength(file);
 	checkoffs = -1;
 	nocdoffs = -1;
@@ -74,24 +83,31 @@ void CheckKingpinFile (HWND hwnd, char *kpfilename)
 
 	if (checkoffs == -1)
 	{
-//		MessageBox(NULL, "Incorrect kingpin.exe version.", "Error", MB_ICONEXCLAMATION | MB_OK);
-		SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Not a Kingpin file.");
-		//Drag en drop
+		SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Not a Kingpin file."));
+
 		DisableExtraGroup (hwnd);
 		DisableResolutionGroup (hwnd);
 		EnableWindow(GetDlgItem(hwnd, IDC_BUTTON_PATCH), FALSE);
 		_close(file);
 		return;
 	}
-	_lseek(file,checkoffs,SEEK_SET);
-	_read(file,checkbyte,7);
+
+	_lseek(file,checkoffs, SEEK_SET);
+	int readBytes = _read(file, checkbyte, 7);
+
+	if (readBytes == -1)
+	{
+		_tperror(_T("Error reading file"));
+		return;
+	}
+
 /*	if ((checkbyte[0] != 0x6b) || (checkbyte[1] != 0x69) || (checkbyte[2] != 0x6e) || (checkbyte[3] != 0x67) 
 		|| (checkbyte[4] != 0x70) || (checkbyte[5] != 0x69) || (checkbyte[6] != 0x6e))//Spelled kingpin hex*/
 	if ((checkbyte[0] != 'k') || (checkbyte[1] != 'i') || (checkbyte[2] != 'n') || (checkbyte[3] != 'g') 
 		|| (checkbyte[4] != 'p') || (checkbyte[5] != 'i') || (checkbyte[6] !='n'))
 	{
 //		MessageBox(NULL, "Not a Kingpin file", "Error", MB_ICONEXCLAMATION | MB_OK);
-		SetDlgItemText(hwnd,LBL_TEXT_KP_CHECK,"Not a Kingpin file.");
+		SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Not a Kingpin file."));
 		//Drag en drop
 		DisableExtraGroup (hwnd);
 		DisableResolutionGroup (hwnd);
@@ -110,9 +126,12 @@ void CheckKingpinFile (HWND hwnd, char *kpfilename)
 		CheckDlgButton(hwnd, IDC_CHECKBOX_COOPDMFLAGS, BST_UNCHECKED);
 
 		EnableWindow(GetDlgItem(hwnd, IDC_BUTTON_PATCH), FALSE);
-		if (fileng == 380928){
+		
+		if (fileng == 380928)
+		{
 			CheckKPresolutionFile (hwnd, kpfilename);//Check resolution
 		}
+		
 		return;
 	}
 
@@ -120,7 +139,14 @@ void CheckKingpinFile (HWND hwnd, char *kpfilename)
 	if (fileng == 376832)
 	{ 
 		_lseek(file,nocdoffs,SEEK_SET);
-		_read(file,nocdbyte,2);
+		readBytes = _read(file, nocdbyte, 2);
+
+		if (readBytes == -1)
+		{
+			_tperror(_T("Error reading file"));
+			return;
+		}
+
 		if ((nocdbyte[0] == 0x90) || (nocdbyte[1] == 0x90))
 		{
 //			MessageBox(NULL, "No CD has already been applied.", "Error", MB_ICONEXCLAMATION | MB_OK);
@@ -139,7 +165,14 @@ void CheckKingpinFile (HWND hwnd, char *kpfilename)
 
 	//Coop dmflags
 	_lseek(file,flagsoffs,SEEK_SET);
-	_read(file,flagsbyte,1);
+	readBytes = _read(file,flagsbyte,1);
+
+	if (readBytes == -1)
+	{
+		_tperror(_T("Error reading file"));
+		return;
+	}
+
 	if (flagsbyte[0] == 0x38)
 	{
 		EnableWindow(GetDlgItem(hwnd, IDC_CHECKBOX_COOPDMFLAGS), TRUE);//Enable Again to remove coop dmflags patch
@@ -154,13 +187,20 @@ void CheckKingpinFile (HWND hwnd, char *kpfilename)
 
 	//Coop maxclients
 	_lseek(file,clientoffs,SEEK_SET);
-	_read(file,clientbyte,1);
+	readBytes = _read(file,clientbyte,1);
+
+	if (readBytes == -1)
+	{
+		_tperror(_T("Error reading file"));
+		return;
+	}
+
 	if (clientbyte[0])
 	{
-		char setcoopclient[] = " ";//Ammount of space
-		strncpy (setcoopclient, (char*)clientbyte, sizeof(clientbyte));	
-
-		coopclients = atoi(setcoopclient); 	
+		char setcoopclient[256] = " "; // Moly -- enough space?
+		strncpy(setcoopclient, (char*) clientbyte, sizeof(setcoopclient) - 1);
+		setcoopclient[sizeof(setcoopclient) - 1] = '\0';
+		coopclients = atoi(setcoopclient);
 
 //		setcoopclients = clientbyte[0] - 48;//52 normal = 4 //Old
 
@@ -179,36 +219,46 @@ void CheckKingpinFile (HWND hwnd, char *kpfilename)
 		} 
 
 //		wsprintf(buffer, _T("Value is 0x%1x"), (unsigned)clientbyte[0]);//Show hex
-//		wsprintf(buffer, _T("Value is %c"), (unsigned)clientbyte[0]);//Show char		
+//		wsprintf(buffer, _T("Value is %c"), (unsigned)clientbyte[0]);//Show char
 //		wsprintf(buffer, _T("Value is %i"), setcoopclients);
-//		MessageBox(NULL, buffer, "Info", MB_ICONEXCLAMATION | MB_OK); 
+//		MessageBox(NULL, buffer, "Info", MB_ICONEXCLAMATION | MB_OK);
 	}
 
 	_close(file);
 
-	CheckKPresolutionFile (hwnd, kpfilename);//Check resolution 
+	CheckKPresolutionFile(hwnd, kpfilename);//Check resolution 
 }
-void GetKingpinFileSize (char *kpfilename)//Just to get filesize check
+
+void GetKingpinFileSize(TCHAR* kpfilename) // Just to get filesize check
 {
-   	FILE *File;
 	long length;
-	TCHAR buffer[128] = _T("");//128 should be enough
+	TCHAR buffer[128] = _T(""); // 128 should be enough
 
-   	File=fopen(kpfilename,"rb");
+	FILE* File = _tfopen(kpfilename, _T("rb"));
 
-   	if(File==NULL)   
-	{ 
-		wsprintf(buffer, _T("Cannot open %s."), kpfilename);
-		MessageBox(NULL, buffer, "Error", MB_ICONEXCLAMATION | MB_OK);                                                
-   		return;
-	}
-	else 
+	if (File == NULL)
 	{
-      	fseek(File,0,SEEK_END);
-      	length=ftell(File);
-		wsprintf(buffer, _T("The Kinpin file's length is %d"), length);
-		MessageBox(NULL, buffer, "Success", MB_ICONINFORMATION | MB_OK);
-      	fclose(File);
-   }
-}
+		_stprintf(buffer, _T("Cannot open %s."), kpfilename);
+		MessageBox(NULL, buffer, _T("Error"), MB_ICONEXCLAMATION | MB_OK);
+		
+		return;
+	}
+	else
+	{
+		fseek(File, 0, SEEK_END);
+		length = ftell(File);
 
+		if (length == -1)
+		{
+			_stprintf(buffer, _T("Failed to get file length for %s."), kpfilename);
+			MessageBox(NULL, buffer, _T("Error"), MB_ICONEXCLAMATION | MB_OK);
+		}
+		else
+		{
+			_stprintf(buffer, _T("The Kingpin file's length is %ld"), length);
+			MessageBox(NULL, buffer, _T("Success"), MB_ICONINFORMATION | MB_OK);
+		}
+
+		fclose(File);
+	}
+}

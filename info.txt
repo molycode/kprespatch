@@ -1,3 +1,0 @@
-Build on Pelles C 8
-
-FREDZ
