@@ -4,7 +4,8 @@
 
 void CheckMD5file (HWND hwnd)
 {
-	int i,len;
+	UINT16 i;
+	size_t len;
 	md5_byte_t buffer[512];
 	TCHAR hex[33]=_T("");
 	TCHAR filename[MAX_PATH]=_T("");
@@ -28,18 +29,17 @@ void CheckMD5file (HWND hwnd)
 	
 	if(lstrlen(filename)&&(pfile=_tfopen(filename,_T("rb"))))
 	{
-						
 		md5_init(&state);
-							
+
 		do
 		{
 			len=fread(buffer,1,512,pfile);
 			if(!ferror(pfile)) 
-				md5_append(&state,(const md5_byte_t *)buffer,len);
+				md5_append(&state,(const md5_byte_t *)buffer,(unsigned int)len);
 			Sleep(0);
 		}
 		while(!feof(pfile));
-							
+
 		md5_finish(&state, digest);
 
 		hex[0]=0;

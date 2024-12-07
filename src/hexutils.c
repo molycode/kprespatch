@@ -3,32 +3,6 @@
 //#include <string.h>should be inside bzero
 #define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
 
-void stringtohex(const TCHAR* text, TCHAR bytes[], size_t byteCount)
-{
-  unsigned int temp;
-
-  for (size_t i = 0; i < byteCount; ++i)
-  {
-    int result;
-#ifdef UNICODE
-    result = swscanf(text + 2 * i, _T("%2x"), &temp); // Parse two hexadecimal characters
-#else
-    result = sscanf(text + 2 * i, "%2x", &temp);
-#endif
-
-    if (result != 1) // Check if exactly one item was parsed successfully
-    {
-      bytes[i] = _T('\0'); // Null terminate to indicate failure
-      _tprintf(_T("Error: Unable to parse hex value at position %zu\n"), i);
-      return; // Exit on failure
-    }
-
-    bytes[i] = (TCHAR) temp; // Store the value as a TCHAR
-  }
-
-  bytes[byteCount] = _T('\0'); // Null-terminate the TCHAR array
-}
-
 /*
  *  Convert a HEXADECIMAL character to a byte.
  *  Returns 255 if an invalid character provided.
@@ -36,36 +10,36 @@ void stringtohex(const TCHAR* text, TCHAR bytes[], size_t byteCount)
 
 int char2hex(char c)
 {
-  if (c >= '0' && c <='9')
-    return ( c - 48);
-  if ( (c >= 'a') && (c <= 'f') )
-    return (c-'a' + 10);
-  
-  if ( (c >= 'A') && (c <='F') )
-    return (c-'A' + 10);
-  
-  return -1;
+	if (c >= '0' && c <='9')
+		return ( c - 48);
+	if ( (c >= 'a') && (c <= 'f') )
+		return (c-'a' + 10);
+	
+	if ( (c >= 'A') && (c <='F') )
+		return (c-'A' + 10);
+	
+	return -1;
 }
 
 int hex2char(char c)
 {
-  if (c <=9)
-    return (c+48);
+	if (c <=9)
+		return (c+48);
 
-  return (c - 10 + 'a');
+	return (c - 10 + 'a');
 }
 
 
 
 
 byte hex2byte(const char c) {
-  if (c >= '0' && c <='9') {
-    return c - '0' + 0;
-  }
-  if (c >= 'A' && c <= 'F') {
-    return c - 'A' + 10;
-  }
-  return 255;
+	if (c >= '0' && c <='9') {
+		return c - '0' + 0;
+	}
+	if (c >= 'A' && c <= 'F') {
+		return c - 'A' + 10;
+	}
+	return 255;
 }
 
 /*
@@ -74,13 +48,13 @@ byte hex2byte(const char c) {
  *  15 provided.
  */
 char byte2hex(const byte d) {
-  if (d <= 9) {
-    return '0' + (d - 0);
-  }
-  if (d <= 15) {
-    return 'A' + (d - 10);
-  }
-  return '*';
+	if (d <= 9) {
+		return '0' + (d - 0);
+	}
+	if (d <= 15) {
+		return 'A' + (d - 10);
+	}
+	return '*';
 }
 
 /*

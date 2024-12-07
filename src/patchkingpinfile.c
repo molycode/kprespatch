@@ -116,7 +116,7 @@ void PatchKingpinFile(HWND hwnd, TCHAR* kpfilename)
 int BackupKingpin(TCHAR* kpfilename, TCHAR* kpbkfilename)
 {
 	FILE *from, *to;
-	char ch;
+	int ch;
 
 	//open source file
 	if ((from = _tfopen(kpfilename, _T("rb"))) == NULL)
@@ -126,7 +126,7 @@ int BackupKingpin(TCHAR* kpfilename, TCHAR* kpbkfilename)
 	}
 
 	//open destination file
-	if ((to = _tfopen(kpbkfilename, _T("Wb"))) == NULL)
+	if ((to = _tfopen(kpbkfilename, _T("wb"))) == NULL)
 	{
 		MessageBox(NULL, _T("Cannot open kingpinbackup.exe file"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
 		exit(1);

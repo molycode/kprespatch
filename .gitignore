@@ -2,3 +2,4 @@ bin/
 lib/
 solution/
 tools/CMake/cmake-bins
+src/main.aps

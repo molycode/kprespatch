@@ -6,14 +6,14 @@
 #include <commctrl.h> // UDM_SETPOS
 #include <strsafe.h> // StringCchPrintf
 
-void CheckResolution(HWND hwnd, int file, size_t size, long offset, char* sizeX, char* sizeY, int spinX, int spinY, int editX, int editY)
+void CheckResolution(HWND hwnd, int file, size_t size, long offset, int spinX, int spinY, int editX, int editY)
 {
 	_lseek(file, offset, SEEK_SET);
 	char* resText = (char*)malloc(size * sizeof(char));
 	
 	if (resText != NULL)
 	{
-		int readBytes = _read(file, resText, size);
+		int readBytes = _read(file, resText, (unsigned int)size);
 
 		if (readBytes == -1)
 		{
@@ -22,30 +22,24 @@ void CheckResolution(HWND hwnd, int file, size_t size, long offset, char* sizeX,
 			return;
 		}
 
-		resText[size * sizeof(char) - 1] = '\0';
+		EnableWindow(GetDlgItem(hwnd, spinX), TRUE);
+		EnableWindow(GetDlgItem(hwnd, spinY), TRUE);
+		EnableWindow(GetDlgItem(hwnd, editX), TRUE);
+		EnableWindow(GetDlgItem(hwnd, editY), TRUE);
 
-		char result[10]; // never bigger than 10
-		snprintf(result, sizeof(result), "%s %s", sizeX, sizeY);
+		int width, height;
 
-		if ((_stricmp(resText, result) == 0))
+		if (sscanf(resText, "%d %d", &width, &height) == 2)
 		{
-			EnableWindow(GetDlgItem(hwnd, spinX), TRUE);
-			EnableWindow(GetDlgItem(hwnd, spinY), TRUE);
-			EnableWindow(GetDlgItem(hwnd, editX), TRUE);
-			EnableWindow(GetDlgItem(hwnd, editY), TRUE);
-
-			SendMessage(GetDlgItem(hwnd, spinX), UDM_SETPOS, 0, (LPARAM) atoi(sizeX));
-			SendMessage(GetDlgItem(hwnd, spinY), UDM_SETPOS, 0, (LPARAM) atoi(sizeY));
+			printf("Width: %d, Height: %d\n", width, height);
 		}
 		else
 		{
-			EnableWindow(GetDlgItem(hwnd, spinX), FALSE);
-			EnableWindow(GetDlgItem(hwnd, spinY), FALSE);
-			EnableWindow(GetDlgItem(hwnd, editX), FALSE);
-			EnableWindow(GetDlgItem(hwnd, editY), FALSE);
-
-			SetDlgItemText(hwnd, LBL_TEXT_KP_CHECK, _T("Can not read mode3."));
+			MessageBox(NULL, _T("sscanf failed in CheckResolution"), _T("Sscanf Error"), MB_ICONEXCLAMATION | MB_OK);
 		}
+
+		SendMessage(GetDlgItem(hwnd, spinX), UDM_SETPOS, 0, (LPARAM)width);
+		SendMessage(GetDlgItem(hwnd, spinY), UDM_SETPOS, 0, (LPARAM)height);
 
 		free(resText);
 	}
@@ -53,7 +47,6 @@ void CheckResolution(HWND hwnd, int file, size_t size, long offset, char* sizeX,
 
 void CheckKPresolutionFile(HWND hwnd, TCHAR* kpfilename)//Read resolutions
 {
-	TCHAR buffer[MAX_PATH] = _T("");
 	int file;
 	long fileng;
 	long mode3offs, mode4offs, mode5offs, mode6offs, mode7offs, mode8offs, mode9offs;
@@ -64,7 +57,8 @@ void CheckKPresolutionFile(HWND hwnd, TCHAR* kpfilename)//Read resolutions
 	if ((file = _open(kpfilename, _O_BINARY | _O_RDWR, _S_IREAD)) == -1)
 #endif
 	{
-		StringCchPrintf(buffer, 128, _T("Cannot open %s."), kpfilename);
+		TCHAR buffer[MAX_PATH] = _T("");
+		StringCchPrintf(buffer, MAX_PATH, _T("Cannot open %s."), kpfilename);
 		MessageBox(NULL, buffer, _T("Error"), MB_ICONEXCLAMATION | MB_OK);
 
 		return;
@@ -93,13 +87,13 @@ void CheckKPresolutionFile(HWND hwnd, TCHAR* kpfilename)//Read resolutions
 		mode9offs = 0x0005A761; //1600 1200
 	}
 
-	CheckResolution(hwnd, file, 8, mode3offs, "640", "480", IDC_MODE3_SPIN640, IDC_MODE3_SPIN480, IDC_MODE3_EDIT640, IDC_MODE3_EDIT480);
-	CheckResolution(hwnd, file, 8, mode4offs, "800", "600", IDC_MODE4_SPIN800, IDC_MODE4_SPIN600, IDC_MODE4_EDIT800, IDC_MODE4_EDIT600);
-	CheckResolution(hwnd, file, 8, mode5offs, "960", "720", IDC_MODE5_SPIN960, IDC_MODE5_SPIN720, IDC_MODE5_EDIT960, IDC_MODE5_EDIT720);
-	CheckResolution(hwnd, file, 9, mode6offs, "1024", "768", IDC_MODE6_SPIN1024, IDC_MODE6_SPIN768, IDC_MODE6_EDIT1024, IDC_MODE6_EDIT768);
-	CheckResolution(hwnd, file, 9, mode7offs, "1152", "864", IDC_MODE7_SPIN1152, IDC_MODE7_SPIN864, IDC_MODE7_EDIT1152, IDC_MODE7_EDIT864);
-	CheckResolution(hwnd, file, 9, mode8offs, "1280", "960", IDC_MODE8_SPIN1280, IDC_MODE8_SPIN960, IDC_MODE8_EDIT1280, IDC_MODE8_EDIT960);
-	CheckResolution(hwnd, file, 10, mode9offs, "1600", "1200", IDC_MODE9_SPIN1600, IDC_MODE9_SPIN1200, IDC_MODE9_EDIT1600, IDC_MODE9_EDIT1200);
+	CheckResolution(hwnd, file, 8, mode3offs, IDC_MODE3_SPIN640, IDC_MODE3_SPIN480, IDC_MODE3_EDIT640, IDC_MODE3_EDIT480);
+	CheckResolution(hwnd, file, 8, mode4offs, IDC_MODE4_SPIN800, IDC_MODE4_SPIN600, IDC_MODE4_EDIT800, IDC_MODE4_EDIT600);
+	CheckResolution(hwnd, file, 8, mode5offs, IDC_MODE5_SPIN960, IDC_MODE5_SPIN720, IDC_MODE5_EDIT960, IDC_MODE5_EDIT720);
+	CheckResolution(hwnd, file, 9, mode6offs, IDC_MODE6_SPIN1024, IDC_MODE6_SPIN768, IDC_MODE6_EDIT1024, IDC_MODE6_EDIT768);
+	CheckResolution(hwnd, file, 9, mode7offs, IDC_MODE7_SPIN1152, IDC_MODE7_SPIN864, IDC_MODE7_EDIT1152, IDC_MODE7_EDIT864);
+	CheckResolution(hwnd, file, 9, mode8offs, IDC_MODE8_SPIN1280, IDC_MODE8_SPIN960, IDC_MODE8_EDIT1280, IDC_MODE8_EDIT960);
+	CheckResolution(hwnd, file, 10, mode9offs, IDC_MODE9_SPIN1600, IDC_MODE9_SPIN1200, IDC_MODE9_EDIT1600, IDC_MODE9_EDIT1200);
 
 	_close(file);
 

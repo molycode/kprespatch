@@ -140,13 +140,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		/* Add our own stuff */
 		wcx.hInstance = hInstance;
 		wcx.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDR_ICO_MAIN));
+		wcx.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SMALL));
 		wcx.lpszClassName = _T("KPresPatch_Class");
 
 		if (!RegisterClassEx(&wcx))
 				return 0;
 
 		/* The user interface is a modal dialog box */
-	 return DialogBox(hInstance, MAKEINTRESOURCE(DLG_MAIN), NULL, (DLGPROC)MainDlgProc);
+		INT_PTR temp = DialogBox(hInstance, MAKEINTRESOURCE(DLG_MAIN), NULL, (DLGPROC) MainDlgProc);
+		return (int)temp;
 }
 
 //Process messages for the About dialog.  The dialog is shown when the user selects "About" in the "Help" menu. 

@@ -1,114 +1,97 @@
 #include "main.h"
 #include "resource.h"
-
 #include "hexutils.h"
-
 #include <io.h>//_open _read
 #include <fcntl.h>//O_ flags
 #include <sys/stat.h>//_S_IREAD
 #include <strsafe.h>
 
-static void WriteToFile(int file, long offset, TCHAR* source, unsigned int maxChars)
+void ConvertToLittleEndian(int value, TCHAR* hexValue, int numDigits)
 {
-	char singleByteData[4] = {'\0'};
+	if (numDigits == 3)
+	{
+		// Mask lower 12 bits (3 hex digits max)
+		value &= 0xFFF;
+	}
+	else if (numDigits == 4)
+	{
+		// Mask lower 16 bits (4 hex digits max)
+		value &= 0xFFFF;
+	}
+	else
+	{
+		MessageBox(NULL, _T("Invalid digit count!"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
+		return;
+	}
+
+	// Convert to little-endian by breaking into bytes
+	hexValue[0] = (TCHAR) ((value >> 0) & 0xFF); // Least significant byte
+	hexValue[1] = (TCHAR) ((value >> 8) & 0xFF); // Next byte
+	hexValue[2] = (TCHAR) ((value >> 16) & 0xFF); // Not used in 3- or 4-digit values, will be 0
+	hexValue[3] = (TCHAR) ((value >> 24) & 0xFF); // Not used in 3- or 4-digit values, will be 0
+}
+
+static void WriteToFile(int file, long offset, TCHAR* source, unsigned int numDigits)
+{
+	char singleByteData[5] = {'\0'};
 
 #ifdef UNICODE
 	// Convert wide characters to single-byte encoding (e.g., UTF-8 or ASCII)
-	wcstombs(singleByteData, source, sizeof(singleByteData));
+	for (unsigned int i = 0; i < numDigits; ++i)
+	{
+		if (source[i] == L'\0') // Preserve null bytes
+		{
+			singleByteData[i] = '\0';
+		}
+		else
+		{
+			int result = wctomb(&singleByteData[i], source[i]);
+		
+			if (result == -1)
+			{
+				// Handle conversion error for the specific wide character
+				TCHAR buffer[64] = _T("");
+				StringCchPrintf(buffer, 64, _T("Failed to convert wide character at position %u"), i);
+				MessageBox(NULL, buffer, _T("Error during WriteToFile"), MB_ICONEXCLAMATION | MB_OK);
+				singleByteData[i] = '?'; // Use a placeholder or skip
+			}
+		}
+	}
 #else
-	strncpy(singleByteData, source, sizeof(singleByteData));
+	memcpy(singleByteData, source, numDigits);
 #endif
 
 	_lseek(file, offset, SEEK_SET);
-	_write(file, singleByteData, maxChars);
+	_write(file, singleByteData, numDigits);
 }
 
-static void WriteNewMode(HWND hwnd, int file, TCHAR* byte1, TCHAR* byte3, long offset1, long offset2, long offset3, int digits)
+static void WriteNewMode(HWND hwnd, int dialogItem, int file, long offset1, long offset2, long offset3)
 {
-	HWND dialog = GetDlgItem(hwnd, IDC_MODE3_EDIT640);
-	int dialogLength = GetWindowTextLength(dialog);
-	TCHAR* dialogText = (TCHAR*) malloc((dialogLength + 1) * sizeof(TCHAR));
+	HWND dialog = GetDlgItem(hwnd, dialogItem);
+	int numDigits = GetWindowTextLength(dialog);
+	TCHAR* dialogText = (TCHAR*) malloc((numDigits + 1) * sizeof(TCHAR));
 
 	if (!dialogText)
 	{
-		MessageBox(NULL, _T("Error allocating memory!"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
+		MessageBox(NULL, _T("Failed to allocate memory for dialogText!"), _T("Memory Allocation Error"), MB_ICONEXCLAMATION | MB_OK);
 		return;
 	}
 
-	GetWindowText(dialog, dialogText, dialogLength + 1);
+	GetWindowText(dialog, dialogText, numDigits + 1);
 
-	TCHAR* valueString = malloc(sizeof(TCHAR) * 4);
-
-	if (!valueString)
-	{
-		free(dialogText);
-		MessageBox(NULL, _T("Memory allocation failed for valueString"), _T("Error"), MB_ICONEXCLAMATION | MB_OK);
-		return;
-	}
-
-	memset(valueString, 0, sizeof(TCHAR) * 4); // Moly: copy 3 or 4 characters?
-	_tcsncpy(valueString, dialogText, 3);
-	valueString[3] = _T('\0');
+	TCHAR valueString[5]; // This is sufficient for 4 digit numbers, double check whether 3 digit numbers need different handling.
+	_tcsncpy(valueString, dialogText, 5);
+	valueString[4] = _T('\0');
 
 	free(dialogText);
 
 	int value = _ttoi(valueString);
+	TCHAR hexValue[5] = { '\0' };
+	ConvertToLittleEndian(value, hexValue, numDigits);
 
-	TCHAR* hexconValue = malloc(sizeof(TCHAR) * 4); // Int to Hex
-	TCHAR* hexValue = malloc(sizeof(TCHAR) * 4); // Endianness
-
-	if (hexconValue != NULL && hexValue != NULL)
-	{
-		memset(hexconValue, 0, sizeof(TCHAR) * 4);
-		_itot(value, hexconValue, 16);
-
-		memset(hexValue, 0, sizeof(TCHAR) * 4);
-
-		if (digits == 3)
-		{
-			if (value < 256)//or FF=255 add 0
-			{
-				hexValue[0] = hexconValue[0];
-				hexValue[1] = hexconValue[1];
-				hexValue[2] = '0';
-				hexValue[3] = '0';
-			}
-			else
-			{
-				hexValue[0] = hexconValue[1];
-				hexValue[1] = hexconValue[2]; //Maybe need switch with 0 but seems okay
-				hexValue[2] = '0';
-				hexValue[3] = hexconValue[0];
-			}
-		}
-		else if (digits == 4)
-		{
-			if (value > 4095)//or FFF=4095 remove 0
-			{
-				hexValue[0] = hexconValue[2];
-				hexValue[1] = hexconValue[3];
-				hexValue[2] = hexconValue[0];//Should always be 0?
-				hexValue[3] = hexconValue[1];
-			}
-			else
-			{
-				hexValue[0] = hexconValue[1];
-				hexValue[1] = hexconValue[2]; //Maybe need switch with 0 but seems okay
-				hexValue[2] = '0';
-				hexValue[3] = hexconValue[0];
-			}
-		}
-
-		stringtohex(hexValue, byte3, 4);
-
-		memset(byte1, 0, sizeof(byte1));
-		_tcsncpy(byte1, valueString, 3); // Moly: copy 3 or 4?
-		free(valueString);
-
-		WriteToFile(file, offset1, byte1, 4);
-		WriteToFile(file, offset2, byte1, 4);
-		WriteToFile(file, offset3, byte3, 4);
-	}
+	WriteToFile(file, offset1, valueString, numDigits);
+	WriteToFile(file, offset2, valueString, numDigits);
+	WriteToFile(file, offset3, hexValue, 2); // Always 2 bytes.
 }
 
 //http://www.wsgf.org/article/common-hex-values
@@ -154,26 +137,7 @@ static void WriteNewMode(HWND hwnd, int file, TCHAR* byte1, TCHAR* byte3, long o
 */
 void PatchKPresolutionFile(HWND hwnd, TCHAR* kpfilename)
 {
-	TCHAR buffer[128] = _T("");//128 should be enough
 	int file;
-	long fileng;
-	long mode3_640_offs1, mode3_480_offs1, mode4_800_offs1, mode4_600_offs1, mode5_960_offs1, mode5_720_offs1,
-		 mode6_1024_offs1, mode6_768_offs1, mode7_1152_offs1, mode7_864_offs1, mode8_1280_offs1, mode8_960_offs1,
-		 mode9_1600_offs1, mode9_1200_offs1;
-	long mode3_640_offs2, mode3_480_offs2, mode4_800_offs2, mode4_600_offs2, mode5_960_offs2, mode5_720_offs2,
-		 mode6_1024_offs2, mode6_768_offs2, mode7_1152_offs2, mode7_864_offs2, mode8_1280_offs2, mode8_960_offs2,
-		 mode9_1600_offs2, mode9_1200_offs2;
-	long mode3_640_offs3, mode3_480_offs3, mode4_800_offs3, mode4_600_offs3, mode5_960_offs3, mode5_720_offs3,
-		 mode6_1024_offs3, mode6_768_offs3, mode7_1152_offs3, mode7_864_offs3, mode8_1280_offs3, mode8_960_offs3,
-		 mode9_1600_offs3, mode9_1200_offs3;
-
-	TCHAR mode3_640_byte1[4], mode3_480_byte1[2], mode4_800_byte1[2], mode4_600_byte1[2], mode5_960_byte1[2], mode5_720_byte1[2],
-		mode6_1024_byte1[3], mode6_768_byte1[2], mode7_1152_byte1[3], mode7_864_byte1[2], mode8_1280_byte1[3], mode8_960_byte1[2],
-		mode9_1600_byte1[3], mode9_1200_byte1[3];
-	TCHAR mode3_640_byte3[4], mode3_480_byte3[2], mode4_800_byte3[2], mode4_600_byte3[2], mode5_960_byte3[2], mode5_720_byte3[2],
-		mode6_1024_byte3[2], mode6_768_byte3[2], mode7_1152_byte3[3], mode7_864_byte3[2], mode8_1280_byte3[3], mode8_960_byte3[2],
-		mode9_1600_byte3[3], mode9_1200_byte3[2];//Always 2 bytes
-
 
 #ifdef UNICODE
 	if ((file = _wopen(kpfilename, _O_BINARY | _O_RDWR, _S_IWRITE)) == -1)
@@ -181,15 +145,26 @@ void PatchKPresolutionFile(HWND hwnd, TCHAR* kpfilename)
 	if ((file = _open(kpfilename, _O_BINARY | _O_RDWR, _S_IWRITE)) == -1)
 #endif
 	{
-		StringCchPrintf(buffer, 128, _T("Cannot open %s."), kpfilename);
+		TCHAR buffer[MAX_PATH] = _T("");
+		StringCchPrintf(buffer, MAX_PATH, _T("Cannot open %s."), kpfilename);
 		MessageBox(NULL, buffer, _T("Error"), MB_ICONEXCLAMATION | MB_OK);
 
 		return;
 	}
 
-	fileng = _filelength(file);
+	long mode3_640_offs1, mode3_480_offs1, mode4_800_offs1, mode4_600_offs1, mode5_960_offs1, mode5_720_offs1,
+		mode6_1024_offs1, mode6_768_offs1, mode7_1152_offs1, mode7_864_offs1, mode8_1280_offs1, mode8_960_offs1,
+		mode9_1600_offs1, mode9_1200_offs1;
+	long mode3_640_offs2, mode3_480_offs2, mode4_800_offs2, mode4_600_offs2, mode5_960_offs2, mode5_720_offs2,
+		mode6_1024_offs2, mode6_768_offs2, mode7_1152_offs2, mode7_864_offs2, mode8_1280_offs2, mode8_960_offs2,
+		mode9_1600_offs2, mode9_1200_offs2;
+	long mode3_640_offs3, mode3_480_offs3, mode4_800_offs3, mode4_600_offs3, mode5_960_offs3, mode5_720_offs3,
+		mode6_1024_offs3, mode6_768_offs3, mode7_1152_offs3, mode7_864_offs3, mode8_1280_offs3, mode8_960_offs3,
+		mode9_1600_offs3, mode9_1200_offs3;
 
-	if (fileng == 380928)//Demo version
+	long const fileLength = _filelength(file);
+
+	if (fileLength == 380928)//Demo version
 	{
 		//Start window menu
 		mode3_640_offs1  = 0x00058701; //640
@@ -285,30 +260,30 @@ void PatchKPresolutionFile(HWND hwnd, TCHAR* kpfilename)
 		mode4_600_offs3  = 0x0005A3D0; //600
 		mode5_960_offs3  = 0x0005A3DC; //960
 		mode5_720_offs3  = 0x0005A3E0; //720
-		mode6_1024_offs3 = 0x0005A3EC; //1024 
+		mode6_1024_offs3 = 0x0005A3EC; //1024
 		mode6_768_offs3  = 0x0005A3F0; //768
-		mode7_1152_offs3 = 0x0005A3FC; //1152 
+		mode7_1152_offs3 = 0x0005A3FC; //1152
 		mode7_864_offs3  = 0x0005A400; //864
-		mode8_1280_offs3 = 0x0005A40C; //1280 
+		mode8_1280_offs3 = 0x0005A40C; //1280
 		mode8_960_offs3  = 0x0005A410; //960
 		mode9_1600_offs3 = 0x0005A41C; //1600
 		mode9_1200_offs3 = 0x0005A420; //1200
 	}
 
-	WriteNewMode(hwnd, file, mode3_640_byte1, mode3_640_byte3, mode3_640_offs1, mode3_640_offs2, mode3_640_offs3, 3);
-	WriteNewMode(hwnd, file, mode3_480_byte1, mode3_480_byte3, mode3_480_offs1, mode3_480_offs2, mode3_480_offs3, 3);
-	WriteNewMode(hwnd, file, mode4_800_byte1, mode4_800_byte3, mode4_800_offs1, mode4_800_offs2, mode4_800_offs3, 3);
-	WriteNewMode(hwnd, file, mode4_600_byte1, mode4_600_byte3, mode4_600_offs1, mode4_600_offs2, mode4_600_offs3, 3);
-	WriteNewMode(hwnd, file, mode5_960_byte1, mode5_960_byte3, mode5_960_offs1, mode5_960_offs2, mode5_960_offs3, 3);
-	WriteNewMode(hwnd, file, mode5_720_byte1, mode5_720_byte3, mode5_720_offs1, mode5_720_offs2, mode5_720_offs3, 3);
-	WriteNewMode(hwnd, file, mode6_1024_byte1, mode6_1024_byte3, mode6_1024_offs1, mode6_1024_offs2, mode6_1024_offs3, 4);
-	WriteNewMode(hwnd, file, mode6_768_byte1, mode6_768_byte3, mode6_768_offs1, mode6_768_offs2, mode6_768_offs3, 3);
-	WriteNewMode(hwnd, file, mode7_1152_byte1, mode7_1152_byte3, mode7_1152_offs1, mode7_1152_offs2, mode7_1152_offs3, 4);
-	WriteNewMode(hwnd, file, mode7_864_byte1, mode7_864_byte3, mode7_864_offs1, mode7_864_offs2, mode7_864_offs3, 3);
-	WriteNewMode(hwnd, file, mode8_1280_byte1, mode8_1280_byte3, mode8_1280_offs1, mode8_1280_offs2, mode8_1280_offs3, 4);
-	WriteNewMode(hwnd, file, mode8_960_byte1, mode8_960_byte3, mode8_960_offs1, mode8_960_offs2, mode8_960_offs3, 3);
-	WriteNewMode(hwnd, file, mode9_1600_byte1, mode9_1600_byte3, mode9_1600_offs1, mode9_1600_offs2, mode9_1600_offs3, 4);
-	WriteNewMode(hwnd, file, mode9_1200_byte1, mode9_1200_byte3, mode9_1200_offs1, mode9_1200_offs2, mode9_1200_offs3, 4);
+	WriteNewMode(hwnd, IDC_MODE3_EDIT640, file, mode3_640_offs1, mode3_640_offs2, mode3_640_offs3);
+	WriteNewMode(hwnd, IDC_MODE3_EDIT480, file, mode3_480_offs1, mode3_480_offs2, mode3_480_offs3);
+	WriteNewMode(hwnd, IDC_MODE4_EDIT800, file, mode4_800_offs1, mode4_800_offs2, mode4_800_offs3);
+	WriteNewMode(hwnd, IDC_MODE4_EDIT600, file, mode4_600_offs1, mode4_600_offs2, mode4_600_offs3);
+	WriteNewMode(hwnd, IDC_MODE5_EDIT960, file, mode5_960_offs1, mode5_960_offs2, mode5_960_offs3);
+	WriteNewMode(hwnd, IDC_MODE5_EDIT720, file, mode5_720_offs1, mode5_720_offs2, mode5_720_offs3);
+	WriteNewMode(hwnd, IDC_MODE6_EDIT1024, file, mode6_1024_offs1, mode6_1024_offs2, mode6_1024_offs3);
+	WriteNewMode(hwnd, IDC_MODE6_EDIT768, file, mode6_768_offs1, mode6_768_offs2, mode6_768_offs3);
+	WriteNewMode(hwnd, IDC_MODE7_EDIT1152, file, mode7_1152_offs1, mode7_1152_offs2, mode7_1152_offs3);
+	WriteNewMode(hwnd, IDC_MODE7_EDIT864, file, mode7_864_offs1, mode7_864_offs2, mode7_864_offs3);
+	WriteNewMode(hwnd, IDC_MODE8_EDIT1280, file, mode8_1280_offs1, mode8_1280_offs2, mode8_1280_offs3);
+	WriteNewMode(hwnd, IDC_MODE8_EDIT960, file, mode8_960_offs1, mode8_960_offs2, mode8_960_offs3);
+	WriteNewMode(hwnd, IDC_MODE9_EDIT1600, file, mode9_1600_offs1, mode9_1600_offs2, mode9_1600_offs3);
+	WriteNewMode(hwnd, IDC_MODE9_EDIT1200, file, mode9_1200_offs1, mode9_1200_offs2, mode9_1200_offs3);
 
 	_close(file);
 }
